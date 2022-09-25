@@ -36,6 +36,7 @@ class MutualInformationRecursionFunction(torch.autograd.Function):
         pxy_grads: List[Optional[torch.Tensor]],
         boundary: Optional[torch.Tensor] = None,
         return_grad: bool = False,
+        scale_up_px_grad: float = 0.0,
     ) -> torch.Tensor:
         """
         Computing mutual information between two sequences of real vectors.
@@ -162,7 +163,10 @@ class MutualInformationRecursionFunction(torch.autograd.Function):
         if return_grad or px.requires_grad or py.requires_grad:
             ans_grad = torch.ones(B, device=px.device, dtype=px.dtype)
             (px_grad, py_grad) = _k2.mutual_information_backward(
-                px, py, boundary, p, ans_grad)
+                px, py, boundary, p, ans_grad
+            )
+            # scale up the px_grad
+            px_grad *= 1 + scale_up_px_grad
             ctx.save_for_backward(px_grad, py_grad)
         assert len(pxy_grads) == 2
         pxy_grads[0] = px_grad
@@ -179,7 +183,7 @@ class MutualInformationRecursionFunction(torch.autograd.Function):
         ans_grad = ans_grad.reshape(B, 1, 1)  # (B, 1, 1)
         px_grad *= ans_grad
         py_grad *= ans_grad
-        return (px_grad, py_grad, None, None, None)
+        return (px_grad, py_grad, None, None, None, None)
 
 
 def mutual_information_recursion(
@@ -187,6 +191,7 @@ def mutual_information_recursion(
     py: Tensor,
     boundary: Optional[Tensor] = None,
     return_grad: bool = False,
+    scale_up_px_grad: float = 0.0,
 ) -> Union[Tuple[Tensor, Tuple[Tensor, Tensor]], Tensor]:
     """A recursion that is useful in computing mutual information between two
     sequences of real vectors, but may be useful more generally in
@@ -291,8 +296,14 @@ def mutual_information_recursion(
     assert px.is_contiguous()
     assert py.is_contiguous()
     pxy_grads = [None, None]
-    scores = MutualInformationRecursionFunction.apply(px, py, pxy_grads,
-                                                      boundary, return_grad)
+    scores = MutualInformationRecursionFunction.apply(
+        px,
+        py,
+        pxy_grads,
+        boundary,
+        return_grad,
+        scale_up_px_grad,
+    )
     px_grad, py_grad = pxy_grads
     return (scores, (px_grad, py_grad)) if return_grad else scores
 
@@ -395,9 +406,9 @@ def joint_mutual_information_recursion(
     # actual derivative w.r.t. the total probs.
     ans_grad = torch.ones(B, device=px_tot.device, dtype=px_tot.dtype)
 
-    (px_grad,
-     py_grad) = _k2.mutual_information_backward(px_tot, py_tot, boundary, p,
-                                                ans_grad)
+    (px_grad, py_grad) = _k2.mutual_information_backward(
+        px_tot, py_tot, boundary, p, ans_grad
+    )
 
     px_grad = px_grad.reshape(1, B, -1)
     py_grad = py_grad.reshape(1, B, -1)

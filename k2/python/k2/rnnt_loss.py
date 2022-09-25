@@ -174,9 +174,7 @@ def get_rnnt_logprobs(
             dim=2,
         )  # now: [B][S][T+1], index [:,:,T] has -inf..
 
-    px_lm = torch.gather(
-        lm[:, :S], dim=2, index=symbols.unsqueeze(-1)
-    )  # [B][S][1]
+    px_lm = torch.gather(lm[:, :S], dim=2, index=symbols.unsqueeze(-1))  # [B][S][1]
 
     px = px_am + px_lm  # [B][S][T+1], last slice with indexes out of
     # boundary is  -inf
@@ -202,6 +200,7 @@ def rnnt_loss_simple(
     modified: bool = False,
     reduction: Optional[str] = "mean",
     return_grad: bool = False,
+    scale_up_px_grad: float = 0.0,
 ) -> Union[Tensor, Tuple[Tensor, Tuple[Tensor, Tensor]]]:
     """A simple case of the RNN-T loss, where the 'joiner' network is just
     addition.
@@ -256,7 +255,11 @@ def rnnt_loss_simple(
         modified=modified,
     )
     scores_and_grads = mutual_information_recursion(
-        px=px, py=py, boundary=boundary, return_grad=return_grad
+        px=px,
+        py=py,
+        boundary=boundary,
+        return_grad=return_grad,
+        scale_up_px_grad=scale_up_px_grad,
     )
     negated_loss = scores_and_grads[0] if return_grad else scores_and_grads
     if reduction == "none":
@@ -344,18 +347,14 @@ def get_rnnt_logprobs_joint(
         px = torch.cat(
             (
                 px,
-                torch.full(
-                    (B, S, 1), float("-inf"), device=px.device, dtype=px.dtype
-                ),
+                torch.full((B, S, 1), float("-inf"), device=px.device, dtype=px.dtype),
             ),
             dim=2,
         )  # now: [B][S][T+1], index [:,:,T] has -inf..
 
     px[:, :, :T] -= normalizers[:, :S, :]
 
-    py = (
-        logits[:, :, :, termination_symbol].permute((0, 2, 1)).clone()
-    )  # [B][S+1][T]
+    py = logits[:, :, :, termination_symbol].permute((0, 2, 1)).clone()  # [B][S+1][T]
     py -= normalizers
     px = px.contiguous()
     py = py.contiguous()
@@ -373,6 +372,7 @@ def rnnt_loss(
     boundary: Optional[Tensor] = None,
     modified: bool = False,
     reduction: Optional[str] = "mean",
+    scale_up_px_grad: float = 0.0,
 ) -> Tensor:
     """A normal RNN-T loss, which uses a 'joiner' network output as input,
     i.e. a 4 dimensions tensor.
@@ -412,7 +412,12 @@ def rnnt_loss(
         boundary=boundary,
         modified=modified,
     )
-    negated_loss = mutual_information_recursion(px=px, py=py, boundary=boundary)
+    negated_loss = mutual_information_recursion(
+        px=px,
+        py=py,
+        boundary=boundary,
+        scale_up_px_grad=scale_up_px_grad,
+    )
     if reduction == "none":
         return -negated_loss
     elif reduction == "mean":
@@ -425,9 +430,7 @@ def rnnt_loss(
         ), f"reduction should be ('none' | 'mean' | 'sum'), given {reduction}"
 
 
-def _adjust_pruning_lower_bound(
-    s_begin: torch.Tensor, s_range: int
-) -> torch.Tensor:
+def _adjust_pruning_lower_bound(s_begin: torch.Tensor, s_range: int) -> torch.Tensor:
     """Adjust s_begin (pruning lower bound) to make it satisfied the following
     constrains
 
@@ -465,17 +468,13 @@ def _adjust_pruning_lower_bound(
     (B, T) = s_begin.shape
     s_begin = k2.monotonic_lower_bound(s_begin)
     # do the magic transformation
-    s_begin = -(
-        s_begin - (s_range - 1) * torch.arange(0, T, device=s_begin.device)
-    )
+    s_begin = -(s_begin - (s_range - 1) * torch.arange(0, T, device=s_begin.device))
     # make the transformed tensor to be non-decreasing
     s_begin = k2.monotonic_lower_bound(s_begin)
     # make start symbol to be zero.
     s_begin = torch.clamp(s_begin, min=0)
     # do the magic transformation again to recover s_begin
-    s_begin = -(
-        s_begin - (s_range - 1) * torch.arange(0, T, device=s_begin.device)
-    )
+    s_begin = -(s_begin - (s_range - 1) * torch.arange(0, T, device=s_begin.device))
     return s_begin
 
 
@@ -536,19 +535,13 @@ def get_rnnt_prune_ranges(
         s_range = S
 
     px_pad = torch.zeros((B, 1, T1), dtype=px_grad.dtype, device=px_grad.device)
-    py_pad = torch.zeros(
-        (B, S + 1, 1), dtype=py_grad.dtype, device=py_grad.device
-    )
+    py_pad = torch.zeros((B, S + 1, 1), dtype=py_grad.dtype, device=py_grad.device)
     py_grad_padded = py_grad if T1 == T else torch.cat((py_grad, py_pad), dim=2)
-    tot_grad = (
-        torch.cat((px_grad, px_pad), dim=1) + py_grad_padded
-    )  # (B, S + 1, T1)
+    tot_grad = torch.cat((px_grad, px_pad), dim=1) + py_grad_padded  # (B, S + 1, T1)
 
     tot_grad = torch.cat(
         (
-            torch.zeros(
-                (B, 1, T1), dtype=tot_grad.dtype, device=tot_grad.device
-            ),
+            torch.zeros((B, 1, T1), dtype=tot_grad.dtype, device=tot_grad.device),
             tot_grad,
         ),
         dim=1,
@@ -653,10 +646,7 @@ def _roll_by_shifts(src: torch.Tensor, shifts: torch.LongTensor):
     assert shifts.shape == (B, T)
 
     index = (
-        torch.arange(S, device=src.device)
-        .view((1, S))
-        .repeat((T, 1))
-        .repeat((B, 1, 1))
+        torch.arange(S, device=src.device).view((1, S)).repeat((T, 1)).repeat((B, 1, 1))
     )
     index = (index - shifts.reshape(B, T, 1)) % S
     return torch.gather(src, 2, index)
@@ -758,9 +748,7 @@ def get_rnnt_logprobs_pruned(
         px = torch.cat(
             (
                 px,
-                torch.full(
-                    (B, S, 1), float("-inf"), device=px.device, dtype=px.dtype
-                ),
+                torch.full((B, S, 1), float("-inf"), device=px.device, dtype=px.dtype),
             ),
             dim=2,
         )  # now: [B][S][T+1], index [:,:,T] has -inf..
@@ -804,6 +792,7 @@ def rnnt_loss_pruned(
     boundary: Tensor = None,
     modified: bool = False,
     reduction: Optional[str] = "mean",
+    scale_up_px_grad: float = 0.0,
 ) -> Tensor:
     """A RNN-T loss with pruning, which uses a pruned 'joiner' network output
     as input, i.e. a 4 dimensions tensor with shape (B, T, s_range, C),
@@ -852,7 +841,12 @@ def rnnt_loss_pruned(
         boundary=boundary,
         modified=modified,
     )
-    negated_loss = mutual_information_recursion(px=px, py=py, boundary=boundary)
+    negated_loss = mutual_information_recursion(
+        px=px,
+        py=py,
+        boundary=boundary,
+        scale_up_px_grad=scale_up_px_grad,
+    )
     if reduction == "none":
         return -negated_loss
     elif reduction == "mean":
@@ -996,9 +990,7 @@ def get_rnnt_logprobs_smoothed(
         + torch.finfo(lm_probs.dtype).tiny
     )  # [1][1][C]
     amonly_normalizers = (
-        torch.mv(am_probs.reshape(-1, C), unigram_lm.reshape(C))
-        .reshape(B, T, 1)
-        .log()
+        torch.mv(am_probs.reshape(-1, C), unigram_lm.reshape(C)).reshape(B, T, 1).log()
         + am_max
     )  # [B][T][1]
     amonly_normalizers = amonly_normalizers.transpose(1, 2)  # [B][1][T]
@@ -1034,9 +1026,7 @@ def get_rnnt_logprobs_smoothed(
             dim=2,
         )  # now: [B][S][T+1], index [:,:,T] has -inf..
 
-    px_lm = torch.gather(
-        lm[:, :S], dim=2, index=symbols.unsqueeze(-1)
-    )  # [B][S][1]
+    px_lm = torch.gather(lm[:, :S], dim=2, index=symbols.unsqueeze(-1))  # [B][S][1]
     px_lm_unigram = torch.gather(
         unigram_lm.expand(B, S, C), dim=2, index=symbols.unsqueeze(-1)
     )  # [B][S][1]
@@ -1069,14 +1059,10 @@ def get_rnnt_logprobs_smoothed(
         am_only_scale = 1.0e-20
 
     px_interp = (
-        px * combined_scale
-        + px_lmonly * lm_only_scale
-        + px_amonly * am_only_scale
+        px * combined_scale + px_lmonly * lm_only_scale + px_amonly * am_only_scale
     )
     py_interp = (
-        py * combined_scale
-        + py_lmonly * lm_only_scale
-        + py_amonly * am_only_scale
+        py * combined_scale + py_lmonly * lm_only_scale + py_amonly * am_only_scale
     )
 
     if not modified:
@@ -1096,6 +1082,7 @@ def rnnt_loss_smoothed(
     modified: bool = False,
     reduction: Optional[str] = "mean",
     return_grad: bool = False,
+    scale_up_px_grad: float = 0.0,
 ) -> Union[Tuple[Tensor, Tuple[Tensor, Tensor]], Tensor]:
     """A simple case of the RNN-T loss, where the 'joiner' network is just
     addition.
@@ -1160,7 +1147,11 @@ def rnnt_loss_smoothed(
         modified=modified,
     )
     scores_and_grads = mutual_information_recursion(
-        px=px, py=py, boundary=boundary, return_grad=return_grad
+        px=px,
+        py=py,
+        boundary=boundary,
+        return_grad=return_grad,
+        scale_up_px_grad=scale_up_px_grad,
     )
     negated_loss = scores_and_grads[0] if return_grad else scores_and_grads
     if reduction == "none":
