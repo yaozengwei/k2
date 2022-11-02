@@ -113,6 +113,11 @@ get_rnnt_prune_ranges
 
 .. autofunction:: get_rnnt_prune_ranges
 
+get_rnnt_prune_ranges_deprecated
+--------------------------------
+
+.. autofunction:: get_rnnt_prune_ranges_deprecated
+
 index_add
 ---------
 
@@ -188,10 +193,10 @@ linear_fst
 
 .. autofunction:: linear_fst
 
-monotonic_lower_bound
----------------------
+linear_fst_with_self_loops
+--------------------------
 
-.. autofunction:: monotonic_lower_bound
+.. autofunction:: linear_fst_with_self_loops
 
 mutual_information_recursion
 ----------------------------
@@ -356,6 +361,11 @@ name
 ^^^^
 
 .. autoattribute:: k2.DeterminizeWeightPushingType.name
+
+value
+^^^^^
+
+.. autoattribute:: k2.DeterminizeWeightPushingType.value
 
 Fsa
 ---
@@ -975,79 +985,6 @@ symbols
 ^^^^^^^
 
 .. autoattribute:: k2.SymbolTable.symbols
-
-_Path
------
-
-link_to
-^^^^^^^
-
-.. automethod:: k2.Path.link_to
-
-rename
-^^^^^^
-
-.. automethod:: k2.Path.rename
-
-replace
-^^^^^^^
-
-.. automethod:: k2.Path.replace
-
-_cparts
-^^^^^^^
-
-.. autoattribute:: k2.Path._cparts
-
-anchor
-^^^^^^
-
-.. autoattribute:: k2.Path.anchor
-
-drive
-^^^^^
-
-.. autoattribute:: k2.Path.drive
-
-name
-^^^^
-
-.. autoattribute:: k2.Path.name
-
-parent
-^^^^^^
-
-.. autoattribute:: k2.Path.parent
-
-parents
-^^^^^^^
-
-.. autoattribute:: k2.Path.parents
-
-parts
-^^^^^
-
-.. autoattribute:: k2.Path.parts
-
-root
-^^^^
-
-.. autoattribute:: k2.Path.root
-
-stem
-^^^^
-
-.. autoattribute:: k2.Path.stem
-
-suffix
-^^^^^^
-
-.. autoattribute:: k2.Path.suffix
-
-suffixes
-^^^^^^^^
-
-.. autoattribute:: k2.Path.suffixes
 
 k2.ragged
 =========
