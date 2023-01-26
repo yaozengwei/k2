@@ -19,6 +19,7 @@
  */
 
 #include <type_traits>
+
 #include "k2/python/csrc/torch/v2/autograd/swoosh.h"
 
 namespace k2 {
@@ -86,9 +87,7 @@ class SwooshFunction
 
     const float *x_data = x.data_ptr<float>();
 
-    auto opts = torch::TensorOptions()
-                    .dtype(torch::kByte)
-                    .device(x.device());
+    auto opts = torch::TensorOptions().dtype(torch::kByte).device(x.device());
     torch::Tensor g = torch::empty(x.sizes(), opts).contiguous();
 
     float *y_data = y.data_ptr<float>();
@@ -124,8 +123,7 @@ class SwooshFunction
           }
 
           y_data[i] = yi;
-          uint8_t g_int =
-              (uint8_t)(gi * (255.0f / 1.005f) + r2_data[i]);
+          uint8_t g_int = (uint8_t)(gi * (255.0f / 1.005f) + r2_data[i]);
           g_data[i] = g_int;
         });
 
@@ -150,9 +148,8 @@ class SwooshFunction
     int32_t stride = out_grad.stride(-1);
     const float *out_grad_data = out_grad.data_ptr<float>();
 
-    auto opts = torch::TensorOptions()
-                    .dtype(torch::kFloat32)
-                    .device(g.device());
+    auto opts =
+        torch::TensorOptions().dtype(torch::kFloat32).device(g.device());
     torch::Tensor in_grad = torch::empty(g.sizes(), opts).contiguous();
     float *in_grad_data = in_grad.data_ptr<float>();
 
@@ -171,8 +168,8 @@ class SwooshFunction
         });
 
     return {
-      in_grad,  // x
-      torch::Tensor() //  dropout_prob
+        in_grad,         // x
+        torch::Tensor()  //  dropout_prob
     };
   }
 };
