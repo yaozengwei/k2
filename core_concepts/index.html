@@ -5,7 +5,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Core concepts in k2 &mdash; k2 1.23.3 documentation</title>
+  <title>Core concepts in k2 &mdash; k2 1.24.1 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
@@ -33,7 +33,7 @@
             <a href="../index.html" class="icon icon-home"> k2
           </a>
               <div class="version">
-                1.23.3
+                1.24.1
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
@@ -364,7 +364,7 @@ the FSA given in <a class="reference internal" href="#autograd-example"><span cl
 <span class="n">fsa</span><span class="o">.</span><span class="n">scores</span> <span class="o">=</span> <span class="n">nnet_output</span>
 <span class="n">fsa</span><span class="o">.</span><span class="n">draw</span><span class="p">(</span><span class="s1">&#39;autograd_tropical.svg&#39;</span><span class="p">)</span>
 <span class="n">fsa_vec</span> <span class="o">=</span> <span class="n">k2</span><span class="o">.</span><span class="n">create_fsa_vec</span><span class="p">([</span><span class="n">fsa</span><span class="p">])</span>
-<span class="n">total_scores</span> <span class="o">=</span> <span class="n">fsa</span><span class="o">.</span><span class="n">get_tot_scores</span><span class="p">(</span><span class="n">log_semiring</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">use_double_scores</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">total_scores</span> <span class="o">=</span> <span class="n">fsa_vec</span><span class="o">.</span><span class="n">get_tot_scores</span><span class="p">(</span><span class="n">log_semiring</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">use_double_scores</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 
 <span class="n">total_scores</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">nnet_output</span><span class="o">.</span><span class="n">grad</span><span class="p">)</span>
